@@ -1,0 +1,14 @@
+{
+  "name": "newworld3",
+  "version": "1.0.0",
+  "description": "3rd time lucky",
+  "main": "app.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "JFJ",
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^5.0.1"
+  }
+}
