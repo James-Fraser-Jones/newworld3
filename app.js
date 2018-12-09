@@ -9,34 +9,7 @@ var db;
 var dbinfo;
 
 //==============================================================================
-//Functions
-
-function openDB(dbName){
-  db = new Database(`database/${dbName}.db`);
-}
-
-function closeDB(){
-  if (db.open){
-    db.close();
-    db = undefined;
-  }
-}
-
-function deleteDB(dbName){
-  try {
-    fs.unlinkSync(`database/${dbName}.db`);
-  }
-  catch (err) {
-    console.log(err.toString());
-  }
-}
-
-//////////////////////////////////////
-//Delete
-
-function deleteFromDB(dels){
-  return dels.map(deleteRowObj);
-}
+//SQL Manipulation
 
 function deleteRowObj(del){
   return deleteRow(del.tableName, del.pkID);
@@ -53,13 +26,6 @@ function deleteRow(tableName, pkID){
   }
 }
 
-//////////////////////////////////////
-//Insert
-
-function insertIntoDB(inserts){
-  return inserts.map(insertRowObj);
-}
-
 function insertRowObj(insert){
   return insertRow(insert.tableName, insert.fieldNames, insert.values);
 }
@@ -73,17 +39,6 @@ function insertRow(tableName, fieldNames, values){
   catch (err){
     return err;
   }
-}
-
-//////////////////////////////////////
-//Update
-
-function updateDB(updates){
-  //make a clone of update object for returning
-  let newupdates = JSON.parse(JSON.stringify(updates)); //this might be inefficient
-
-  newupdates.map(updateCellObj);
-  return newupdates;
 }
 
 function updateCellObj(update){
@@ -110,18 +65,47 @@ function updateCell(tableName, fieldName, pkID, value){
   }
 }
 
-//////////////////////////////////////
+//////////////////////////////////////////////////
+//Exposed methods
 
-function initAuctionDB(){
-  //create tables
-  db.exec(generateDBSQL(initDB));
+function updateDB(updates){
+  //make a clone of update object for returning
+  let newupdates = JSON.parse(JSON.stringify(updates)); //this might be inefficient
 
-  //populate tables
-  insertIntoDB(initInsert);
+  newupdates.map(updateCellObj);
+  return newupdates;
+}
+
+function insertIntoDB(inserts){
+  return inserts.map(insertRowObj);
+}
+
+function deleteFromDB(dels){
+  return dels.map(deleteRowObj);
+}
+
+function openDB(dbName){
+  db = new Database(`database/${dbName}.db`);
+}
+
+function closeDB(){
+  if (db.open){
+    db.close();
+    db = undefined;
+  }
+}
+
+function deleteDB(dbName){
+  try {
+    fs.unlinkSync(`database/${dbName}.db`);
+  }
+  catch (err) {
+    console.log(err.toString());
+  }
 }
 
 //==============================================================================
-//SQL Generation
+//SQL Representation
 
 const sqliteType = {
   INTEGER : 1,
@@ -162,9 +146,28 @@ function makeTable(name, autoinc){
   };
 }
 
-function addField(table, field){
-  table.fields.push(field);
+//////////////////////////////////////////////////
+//Exposed methods
+
+function makeDB(name){
+  return {
+    name: name, //String
+    tables: []
+  };
 }
+
+function addTable(db, name, autoinc){
+  let newtable = makeTable(name, autoinc);
+  db.tables.push(newtable);
+  return newtable;
+}
+
+function addField(table, name, type, nullable, unique, def, check, foreign){
+  table.fields.push(makeField(name, type, nullable, unique, def, check, foreign));
+}
+
+//==============================================================================
+//SQL Generation
 
 //wrap string values in single quotes, not necessary when utilizing prepared statements for value injection
 function wrap(value){
@@ -174,81 +177,82 @@ function wrap(value){
   return value;
 }
 
-//////////////////////////////////////
-
-function generateDBSQL(dbObj){
-  return dbObj.map(generateTableSQL).join("\n\n");
-}
-
-function generateTableSQL(tableObj){
-  let pri = generatePrimary(tableObj);
-  let fi = tableObj.fields.map(generateFieldSQL);
-  let fo = tableObj.fields.map(generateForeignSQL).filter(str => str !== "");
+function generateTableSQL(table){
+  let pri = generatePrimary(table);
+  let fi = table.fields.map(generateFieldSQL);
+  let fo = table.fields.map(generateForeignSQL).filter(str => str !== "");
   let lines = fi.concat(fo);
   lines.unshift(pri);
-  return `CREATE TABLE '${tableObj.name}' (\n${lines.join(",\n")}\n);`;
+  return `CREATE TABLE '${table.name}' (\n${lines.join(",\n")}\n);`;
 }
 
-function generatePrimary(tableObj){
-  return `  '${tableObj.name}ID' INTEGER NOT NULL PRIMARY KEY ${tableObj.autoinc ? "AUTOINCREMENT " : ""}UNIQUE`;
+function generatePrimary(table){
+  return `  '${table.name}ID' INTEGER NOT NULL PRIMARY KEY ${table.autoinc ? "AUTOINCREMENT " : ""}UNIQUE`;
 }
 
-function generateFieldSQL(fieldObj){
+function generateFieldSQL(field){
   let words = [];
-  words.push(`  '${fieldObj.name}'`);
-  words.push(getSqliteType(fieldObj.type));
-  if (!fieldObj.nullable){ words.push("NOT NULL") };
-  if (fieldObj.default){ words.push(`DEFAULT ${wrap(fieldObj.default)}`) };
-  if (fieldObj.check){ words.push(`CHECK (${fieldObj.check})`) };
-  if (fieldObj.unique){ words.push("UNIQUE") };
+  words.push(`  '${field.name}'`);
+  words.push(getSqliteType(field.type));
+  if (!field.nullable){ words.push("NOT NULL") };
+  if (field.default){ words.push(`DEFAULT ${wrap(field.default)}`) };
+  if (field.check){ words.push(`CHECK (${field.check})`) };
+  if (field.unique){ words.push("UNIQUE") };
   return words.join(" ");
 }
 
-function generateForeignSQL(fieldObj){
-  return fieldObj.foreign ? `  FOREIGN KEY ('${fieldObj.name}') REFERENCES '${fieldObj.foreign}'(${fieldObj.foreign}ID)` : "";
+function generateForeignSQL(field){
+  return field.foreign ? `  FOREIGN KEY ('${field.name}') REFERENCES '${field.foreign}'(${field.foreign}ID)` : "";
+}
+
+//////////////////////////////////////////////////
+//Exposed methods
+
+function generateDBSQL(db){
+  return db.tables.map(generateTableSQL).join("\n\n");
 }
 
 //==============================================================================
-//SQL
+//SQL (specific to the auction db schema that I designed)
 
-const permissionTable = makeTable("Permission", false);
-addField(permissionTable, makeField("Name", sqliteType.TEXT, false, false, null, null, null));
+const auctionDB = makeDB("auctionDB");
 
-const bodTable = makeTable("Bod", true);
-addField(bodTable, makeField("PermissionID", sqliteType.INTEGER, false, false, null, null, "Permission"));
-addField(bodTable, makeField("FirstName", sqliteType.TEXT, false, false, null, null, null));
-addField(bodTable, makeField("LastName", sqliteType.TEXT, false, false, null, null, null));
-addField(bodTable, makeField("ContactNum", sqliteType.TEXT, false, false, null, null, null));
-addField(bodTable, makeField("Email", sqliteType.TEXT, false, false, null, null, null));
-addField(bodTable, makeField("Address", sqliteType.TEXT, true, false, null, null, null));
+const permission = addTable(auctionDB, "Permission", false);
+addField(permission, "Name", sqliteType.TEXT, false, false, null, null, null);
 
-const itemTable = makeTable("Item", true);
-addField(itemTable, makeField("OwnerID", sqliteType.INTEGER, false, false, null, null, "Bod"));
-addField(itemTable, makeField("Name", sqliteType.TEXT, false, false, null, null, null));
-addField(itemTable, makeField("Desc", sqliteType.TEXT, false, false, null, null, null));
+const bod = addTable(auctionDB, "Bod", true);
+addField(bod, "PermissionID", sqliteType.INTEGER, false, false, null, null, "Permission");
+addField(bod, "FirstName", sqliteType.TEXT, false, false, null, null, null);
+addField(bod, "LastName", sqliteType.TEXT, false, false, null, null, null);
+addField(bod, "ContactNum", sqliteType.TEXT, false, false, null, null, null);
+addField(bod, "Email", sqliteType.TEXT, false, false, null, null, null);
+addField(bod, "Address", sqliteType.TEXT, true, false, null, null, null);
 
-const auctionTable = makeTable("Auction", true);
-addField(auctionTable, makeField("Address", sqliteType.TEXT, false, false, null, null, null));
-addField(auctionTable, makeField("Start", sqliteType.TEXT, false, false, null, null, null));
-addField(auctionTable, makeField("End", sqliteType.TEXT, false, false, null, null, null));
+const item = addTable(auctionDB, "Item", true);
+addField(item, "OwnerID", sqliteType.INTEGER, false, false, null, null, "Bod");
+addField(item, "Name", sqliteType.TEXT, false, false, null, null, null);
+addField(item, "Desc", sqliteType.TEXT, false, false, null, null, null);
 
-const auctionitemTable = makeTable("AuctionItem", true);
-addField(auctionitemTable, makeField("AuctionID", sqliteType.INTEGER, false, false, null, null, "Auction"));
-addField(auctionitemTable, makeField("ItemID", sqliteType.INTEGER, false, false, null, null, "Item"));
-addField(auctionitemTable, makeField("TransactionID", sqliteType.INTEGER, false, false, null, null, "Transaction"));
-addField(auctionitemTable, makeField("AskingPrice", sqliteType.INTEGER, false, false, null, null, null));
-addField(auctionitemTable, makeField("ReservePrice", sqliteType.INTEGER, true, false, null, null, null));
-addField(auctionitemTable, makeField("PresaleBidPrice", sqliteType.INTEGER, true, false, null, null, null));
+const auction = addTable(auctionDB, "Auction", true);
+addField(auction, "Address", sqliteType.TEXT, false, false, null, null, null);
+addField(auction, "Start", sqliteType.TEXT, false, false, null, null, null);
+addField(auction, "End", sqliteType.TEXT, false, false, null, null, null);
 
-const transactionTable = makeTable("Transaction", true);
-addField(transactionTable, makeField("BuyerID", sqliteType.INTEGER, false, false, null, null, "Bod"));
-addField(transactionTable, makeField("SellerID", sqliteType.INTEGER, false, false, null, null, "Bod"));
-addField(transactionTable, makeField("ItemID", sqliteType.INTEGER, false, false, null, null, "Item"));
-addField(transactionTable, makeField("Price", sqliteType.INTEGER, false, false, null, null, null));
-addField(transactionTable, makeField("Happened", sqliteType.TEXT, false, false, null, null, null));
-addField(transactionTable, makeField("BeenPaid", sqliteType.INTEGER, false, false, null, null, null));
+const auctionItem = addTable(auctionDB, "AuctionItem", true);
+addField(auctionItem, "AuctionID", sqliteType.INTEGER, false, false, null, null, "Auction");
+addField(auctionItem, "ItemID", sqliteType.INTEGER, false, false, null, null, "Item");
+addField(auctionItem, "TransactionID", sqliteType.INTEGER, false, false, null, null, "Transaction");
+addField(auctionItem, "AskingPrice", sqliteType.INTEGER, false, false, null, null, null);
+addField(auctionItem, "ReservePrice", sqliteType.INTEGER, true, false, null, null, null);
+addField(auctionItem, "PresaleBidPrice", sqliteType.INTEGER, true, false, null, null, null);
 
-const initDB = [permissionTable, bodTable, itemTable, auctionTable, auctionitemTable, transactionTable];
+const transaction = addTable(auctionDB, "Transaction", true);
+addField(transaction, "BuyerID", sqliteType.INTEGER, false, false, null, null, "Bod");
+addField(transaction, "SellerID", sqliteType.INTEGER, false, false, null, null, "Bod");
+addField(transaction, "ItemID", sqliteType.INTEGER, false, false, null, null, "Item");
+addField(transaction, "Price", sqliteType.INTEGER, false, false, null, null, null);
+addField(transaction, "Happened", sqliteType.TEXT, false, false, null, null, null);
+addField(transaction, "BeenPaid", sqliteType.INTEGER, false, false, null, null, null);
 
 const initInsert =
 [{tableName:"Permission", fieldNames:["PermissionID", "Name"], values:[1, "Admin"]},
@@ -256,6 +260,12 @@ const initInsert =
  {tableName:"Permission", fieldNames:["PermissionID", "Name"], values:[3, "Employee"]},
  {tableName:"Permission", fieldNames:["PermissionID", "Name"], values:[4, "Customer"]},
  {tableName:"Bod", fieldNames:["PermissionID", "FirstName", "LastName", "ContactNum", "Email"], values:[1, "Admin", "Admin", "", ""]}];
+
+//create and populate tables
+function initAuctionDB(){
+  db.exec(generateDBSQL(auctionDB));
+  insertIntoDB(initInsert);
+}
 
 //==============================================================================
 //Testing code
@@ -299,6 +309,9 @@ initAuctionDB();
 // console.log(generateTableSQL(auctionitemTable));
 // console.log("\n\nTransaction Table:\n");
 // console.log(generateTableSQL(transactionTable));
+
+//==============================================================================
+//Notes
 
 /*
 So we've got a bunch of types so far:
