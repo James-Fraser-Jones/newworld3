@@ -6,6 +6,7 @@
 const fs = require('fs');
 const Database = require('better-sqlite3');
 var db;
+var dbinfo;
 
 //==============================================================================
 //Functions
@@ -22,7 +23,12 @@ function closeDB(){
 }
 
 function deleteDB(dbName){
-  fs.unlinkSync(`database/${dbName}.db`);
+  try {
+    fs.unlinkSync(`database/${dbName}.db`);
+  }
+  catch (err) {
+    console.log(err.toString());
+  }
 }
 
 //////////////////////////////////////
@@ -108,98 +114,148 @@ function updateCell(tableName, fieldName, pkID, value){
 
 function initAuctionDB(){
   //create tables
-  db.exec(makePermission);
-  db.exec(makeBod);
-  db.exec(makeAuction);
-  db.exec(makeItem);
-  db.exec(makeTransaction);
-  db.exec(makeAuctionItem);
+  db.exec(generateDBSQL(initDB));
 
   //populate tables
-  db.exec(makePermissions);
-  db.exec(makeAdminBod);
+  insertIntoDB(initInsert);
+}
+
+//==============================================================================
+//SQL Generation
+
+const sqliteType = {
+  INTEGER : 1,
+  TEXT : 2,
+  BLOB : 3,
+  REAL : 4,
+  NUMERIC : 5
+}
+
+function getSqliteType(num){
+  let values = Object.values(sqliteType);
+  let i;
+  for (i = 0; i < values.length; i++){
+    if (num === values[i]){
+      return Object.keys(sqliteType)[i];
+    }
+  }
+  return null;
+}
+
+function makeField(name, type, nullable, unique, def, check, foreign){
+  return {
+    name: name,           //String
+    type: type,           //sqliteType enum
+    nullable: nullable,   //Boolean
+    unique: unique,       //Boolean
+    default: def,         //NULL or Value
+    check: check,         //NULL or String
+    foreign: foreign      //NULL or String
+  };
+}
+
+function makeTable(name, autoinc){
+  return {
+    name: name,       //String
+    autoinc: autoinc, //Boolean
+    fields: []
+  };
+}
+
+function addField(table, field){
+  table.fields.push(field);
+}
+
+//wrap string values in single quotes, not necessary when utilizing prepared statements for value injection
+function wrap(value){
+  if ((typeof value) === "string"){
+    return `'${value}'`;
+  }
+  return value;
+}
+
+//////////////////////////////////////
+
+function generateDBSQL(dbObj){
+  return dbObj.map(generateTableSQL).join("\n\n");
+}
+
+function generateTableSQL(tableObj){
+  let pri = generatePrimary(tableObj);
+  let fi = tableObj.fields.map(generateFieldSQL);
+  let fo = tableObj.fields.map(generateForeignSQL).filter(str => str !== "");
+  let lines = fi.concat(fo);
+  lines.unshift(pri);
+  return `CREATE TABLE '${tableObj.name}' (\n${lines.join(",\n")}\n);`;
+}
+
+function generatePrimary(tableObj){
+  return `  '${tableObj.name}ID' INTEGER NOT NULL PRIMARY KEY ${tableObj.autoinc ? "AUTOINCREMENT " : ""}UNIQUE`;
+}
+
+function generateFieldSQL(fieldObj){
+  let words = [];
+  words.push(`  '${fieldObj.name}'`);
+  words.push(getSqliteType(fieldObj.type));
+  if (!fieldObj.nullable){ words.push("NOT NULL") };
+  if (fieldObj.default){ words.push(`DEFAULT ${wrap(fieldObj.default)}`) };
+  if (fieldObj.check){ words.push(`CHECK (${fieldObj.check})`) };
+  if (fieldObj.unique){ words.push("UNIQUE") };
+  return words.join(" ");
+}
+
+function generateForeignSQL(fieldObj){
+  return fieldObj.foreign ? `  FOREIGN KEY ('${fieldObj.name}') REFERENCES '${fieldObj.foreign}'(${fieldObj.foreign}ID)` : "";
 }
 
 //==============================================================================
 //SQL
 
-const makePermissions =
-`INSERT INTO Permission (PermissionID, PermissionName) VALUES
- (1, 'Admin'),
- (2, 'Manager'),
- (3, 'Employee'),
- (4, 'Customer');
-`;
+const permissionTable = makeTable("Permission", false);
+addField(permissionTable, makeField("Name", sqliteType.TEXT, false, false, null, null, null));
 
-const makeAdminBod =
-`INSERT INTO Bod (PermissionID, FirstName, LastName, ContactNum, Email) VALUES
- (1, 'Admin', 'Admin', '', '');
-`;
+const bodTable = makeTable("Bod", true);
+addField(bodTable, makeField("PermissionID", sqliteType.INTEGER, false, false, null, null, "Permission"));
+addField(bodTable, makeField("FirstName", sqliteType.TEXT, false, false, null, null, null));
+addField(bodTable, makeField("LastName", sqliteType.TEXT, false, false, null, null, null));
+addField(bodTable, makeField("ContactNum", sqliteType.TEXT, false, false, null, null, null));
+addField(bodTable, makeField("Email", sqliteType.TEXT, false, false, null, null, null));
+addField(bodTable, makeField("Address", sqliteType.TEXT, true, false, null, null, null));
 
-//////////////////////////////////////
+const itemTable = makeTable("Item", true);
+addField(itemTable, makeField("OwnerID", sqliteType.INTEGER, false, false, null, null, "Bod"));
+addField(itemTable, makeField("Name", sqliteType.TEXT, false, false, null, null, null));
+addField(itemTable, makeField("Desc", sqliteType.TEXT, false, false, null, null, null));
 
-const makePermission =
-`CREATE TABLE 'Permission' (
-	'PermissionID'	INTEGER NOT NULL PRIMARY KEY UNIQUE,
-	'PermissionName'	TEXT NOT NULL
-);`;
+const auctionTable = makeTable("Auction", true);
+addField(auctionTable, makeField("Address", sqliteType.TEXT, false, false, null, null, null));
+addField(auctionTable, makeField("Start", sqliteType.TEXT, false, false, null, null, null));
+addField(auctionTable, makeField("End", sqliteType.TEXT, false, false, null, null, null));
 
-const makeBod =
-`CREATE TABLE 'Bod' (
-	'BodID'	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
-  'PermissionID'	INTEGER NOT NULL,
-	'FirstName'	TEXT NOT NULL,
-	'LastName'	TEXT NOT NULL,
-	'ContactNum'	TEXT NOT NULL,
-	'Email'	TEXT NOT NULL,
-	'Address'	TEXT,
-	FOREIGN KEY('PermissionID') REFERENCES Permission(PermissionID)
-);`;
+const auctionitemTable = makeTable("AuctionItem", true);
+addField(auctionitemTable, makeField("AuctionID", sqliteType.INTEGER, false, false, null, null, "Auction"));
+addField(auctionitemTable, makeField("ItemID", sqliteType.INTEGER, false, false, null, null, "Item"));
+addField(auctionitemTable, makeField("TransactionID", sqliteType.INTEGER, false, false, null, null, "Transaction"));
+addField(auctionitemTable, makeField("AskingPrice", sqliteType.INTEGER, false, false, null, null, null));
+addField(auctionitemTable, makeField("ReservePrice", sqliteType.INTEGER, true, false, null, null, null));
+addField(auctionitemTable, makeField("PresaleBidPrice", sqliteType.INTEGER, true, false, null, null, null));
 
-const makeAuction =
-`CREATE TABLE 'Auction' (
-	'AuctionID'	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
-	'Address'	TEXT NOT NULL,
-	'Start'	TEXT NOT NULL,
-	'End'	TEXT NOT NULL
-);`;
+const transactionTable = makeTable("Transaction", true);
+addField(transactionTable, makeField("BuyerID", sqliteType.INTEGER, false, false, null, null, "Bod"));
+addField(transactionTable, makeField("SellerID", sqliteType.INTEGER, false, false, null, null, "Bod"));
+addField(transactionTable, makeField("ItemID", sqliteType.INTEGER, false, false, null, null, "Item"));
+addField(transactionTable, makeField("Price", sqliteType.INTEGER, false, false, null, null, null));
+addField(transactionTable, makeField("Happened", sqliteType.TEXT, false, false, null, null, null));
+addField(transactionTable, makeField("BeenPaid", sqliteType.INTEGER, false, false, null, null, null));
 
-const makeItem =
-`CREATE TABLE 'Item' (
-	'ItemID'	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
-  'OwnerID'	INTEGER NOT NULL,
-	'ItemName'	TEXT NOT NULL,
-	'ItemDesc'	TEXT NOT NULL,
-	FOREIGN KEY('OwnerID') REFERENCES Bod(BodID)
-);`;
+const initDB = [permissionTable, bodTable, itemTable, auctionTable, auctionitemTable, transactionTable];
 
-const makeTransaction =
-`CREATE TABLE 'Transaction' (
-	'TransactionID'	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
-	'BuyerID'	INTEGER NOT NULL,
-	'SellerID'	INTEGER NOT NULL,
-	'ItemID'	INTEGER NOT NULL,
-	'Price'	INTEGER NOT NULL,
-	'TransTime'	TEXT NOT NULL,
-	'BeenPaidBool'	INTEGER NOT NULL,
-	FOREIGN KEY('BuyerID') REFERENCES Bod(BodID),
-	FOREIGN KEY('SellerID') REFERENCES Bod(BodID),
-	FOREIGN KEY('ItemID') REFERENCES Item(ItemID)
-);`;
-
-const makeAuctionItem =
-`CREATE TABLE 'AuctionItem' (
-	'AuctionItemID'	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
-	'AuctionID'	INTEGER NOT NULL,
-	'ItemID'	INTEGER NOT NULL,
-	'TransactionID'	INTEGER NOT NULL,
-	'AskingPrice'	INTEGER NOT NULL,
-	'ReservePrice'	INTEGER,
-	'PresaleBidPrice'	INTEGER,
-	FOREIGN KEY('AuctionID') REFERENCES Auction(AuctionID),
-	FOREIGN KEY('ItemID') REFERENCES Item(ItemID),
-	FOREIGN KEY('TransactionID') REFERENCES 'Transaction'(TransactionID)
-);`;
+const initInsert =
+[{tableName:"Permission", fieldNames:["PermissionID", "Name"], values:[1, "Admin"]},
+ {tableName:"Permission", fieldNames:["PermissionID", "Name"], values:[2, "Manager"]},
+ {tableName:"Permission", fieldNames:["PermissionID", "Name"], values:[3, "Employee"]},
+ {tableName:"Permission", fieldNames:["PermissionID", "Name"], values:[4, "Customer"]},
+ {tableName:"Bod", fieldNames:["PermissionID", "FirstName", "LastName", "ContactNum", "Email"], values:[1, "Admin", "Admin", "", ""]}];
 
 //==============================================================================
 //Testing code
@@ -209,23 +265,46 @@ deleteDB("test1");
 openDB("test1");
 initAuctionDB();
 
-//test cell updating
-let exampleUpdates =
-[{tableName:"Bod", fieldName:"Email", pkID:1, value:"Mr Johnson"},
- {tableName:"Bid", fieldName:"Address", pkID:1, value:55}];
-console.log("\nUpdate Test:\n");
-console.log(updateDB(exampleUpdates));
+// //test cell updating
+// let exampleUpdates =
+// [{tableName:"Bod", fieldName:"Email", pkID:1, value:"Mr Johnson"},
+//  {tableName:"Bid", fieldName:"Address", pkID:1, value:55}];
+// console.log("\nUpdate Test:\n");
+// console.log(updateDB(exampleUpdates));
+//
+// //test row inserting
+// let exampleInserts =
+// [{tableName:"Bod", fieldNames:["PermissionID", "FirstName", "LastName", "ContactNum", "Email", "Address"], values:[1, "Alex", "Baby", "07940234567", "donkey@home.co.uk", "My house"]},
+//  {tableName:"Bod", fieldNames:["BermissionID", "FirstName", "LastName", "ContactNum", "Email", "Address"], values:[2, "Johnny", "Rotten", "666", "dunkey@home.co.uk", "Peach's Castle"]}];
+// console.log("\n\nInsert Test:\n");
+// console.log(insertIntoDB(exampleInserts));
+//
+// //test row deletion
+// let exampleDeletes =
+// [{tableName:"Permission", pkID:3},
+//  {tableName:"Parmission", pkID:4}];
+// console.log("\n\nDelete Test:\n");
+// console.log(deleteFromDB(exampleDeletes));
+//
+// //test sql generation
+// console.log("\n\nPermission Table:\n");
+// console.log(generateTableSQL(permissionTable));
+// console.log("\n\nBod Table:\n");
+// console.log(generateTableSQL(bodTable));
+// console.log("\n\nItem Table:\n");
+// console.log(generateTableSQL(itemTable));
+// console.log("\n\nAuction Table:\n");
+// console.log(generateTableSQL(auctionTable));
+// console.log("\n\nAuctionItem Table:\n");
+// console.log(generateTableSQL(auctionitemTable));
+// console.log("\n\nTransaction Table:\n");
+// console.log(generateTableSQL(transactionTable));
 
-//test row inserting
-let exampleInserts =
-[{tableName:"Bod", fieldNames:["PermissionID", "FirstName", "LastName", "ContactNum", "Email", "Address"], values:[1, "Alex", "Baby", "07940234567", "donkey@home.co.uk", "My house"]},
- {tableName:"Bod", fieldNames:["BermissionID", "FirstName", "LastName", "ContactNum", "Email", "Address"], values:[2, "Johnny", "Rotten", "666", "dunkey@home.co.uk", "Peach's Castle"]}];
-console.log("\n\nInsert Test:\n");
-console.log(insertIntoDB(exampleInserts));
-
-//test row deletion
-let exampleDeletes =
-[{tableName:"Permission", pkID:3},
- {tableName:"Parmission", pkID:4}];
-console.log("\n\nDelete Test:\n");
-console.log(deleteFromDB(exampleDeletes));
+/*
+So we've got a bunch of types so far:
+Boolean (Integer)
+Integer
+Text
+Date (Text)
+Money (Integer)
+*/
