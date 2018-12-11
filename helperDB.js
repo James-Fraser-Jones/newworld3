@@ -50,52 +50,47 @@ function generateDB(db, dbObj){
   try {
     let sql = generateDBSQL(dbObj);
     db.exec(sql);
-    return "Generation Success!";
+    return "DB Generation Success!";
   }
   catch (err){
     return err;
   }
 }
 
-//TODO: BOTH INSERT AND DELETE FUNCTIONS NEED TO DO THE SAME THING AS UPDATE AND RETURN AN OBJECT THAT CAN BE INSPECTED
-//IT'S NOT USEFUL TO HAVE TABLE/FIELD/ROW/etc.. INFO GET LOST WHEN RETRIEVING SUCESS/ERROR MESSAGES
-
-//returns array of inserted pkIDs, and possible errors
+//returns copy of inserts object with additional field "result", this contains success bool and either an error or pkID of inserted row
 function insertIntoDB(db, inserts){
-  return inserts.map(insertRowObj(db));
+  let newinserts = JSON.parse(JSON.stringify(inserts)); //make new copy of update structure (might be inefficient)
+  newinserts.map(insert => {insert.result = insertRowObj(db, insert);});
+  return newinserts;
 }
 
-//returns same update structure as is passed in, with values taken by querying database after update to ensure consistency
+//returns copy of updates object with additional field "result", this contains success bool and either an error or recently queried value
 function updateDB(db, updates){
   let newupdates = JSON.parse(JSON.stringify(updates)); //make new copy of update structure (might be inefficient)
-  newupdates.map(update => {update.value = updateCellObj(db)(update);});
+  newupdates.map(update => {update.result = updateCellObj(db, update);});
   return newupdates;
 }
 
-//returns array of 0/1s (indicating whether each record was found), and possible errors
+//returns copy of dels object with additional field "result", this contains success bool and either an error or number of affected rows
 function deleteFromDB(db, dels){
-  return dels.map(deleteRowObj(db));
+  let newdels = JSON.parse(JSON.stringify(dels)); //make new copy of update structure (might be inefficient)
+  newdels.map(del => {del.result = deleteRowObj(db, del);});
+  return newdels;
 }
 
 //==============================================================================
 //DB Manipulation
 
-function insertRowObj(db){
-  return (insert => {
-    return insertRow(db, insert.tableName, insert.fieldNames, insert.values);
-  });
+function insertRowObj(db, insert){
+  return insertRow(db, insert.tableName, insert.fieldNames, insert.values);
 }
 
-function updateCellObj(db){
-  return (update => {
-    return updateCell(db, update.tableName, update.fieldName, update.pkID, update.value);
-  });
+function updateCellObj(db, update){
+  return updateCell(db, update.tableName, update.fieldName, update.pkID, update.value);
 }
 
-function deleteRowObj(db){
-  return (del => {
-    return deleteRow(db, del.tableName, del.pkID);
-  });
+function deleteRowObj(db, del){
+  return deleteRow(db, del.tableName, del.pkID);
 }
 
 //returns pkID of newly inserted row, or an error
@@ -103,32 +98,32 @@ function insertRow(db, tableName, fieldNames, values){
   //attempt insert, or return error
   try{
     let preparedInsert = db.prepare(`INSERT INTO ${tableName}(${fieldNames.join(",")}) VALUES (${values.map(() => "?").join(",")})`);
-    return preparedInsert.run(values).lastInsertRowid;
+    let lastInsertedID = preparedInsert.run(values).lastInsertRowid;
+    return {success: true, response: lastInsertedID};
   }
   catch (err){
-    return err;
+    return {success: false, response: err};
   }
 }
 
 //returns value of updated field after applying the update, or an error
 function updateCell(db, tableName, fieldName, pkID, value){
   //attempt update, or return error
-
   try{
     let preparedUpdate = db.prepare(`UPDATE ${tableName} SET ${fieldName} = ? WHERE ${tableName}ID = ?`);
     preparedUpdate.run(value, pkID);
   }
   catch (err){
-    return err;
+    return {success: false, response: err};
   }
-
   //attempt query, or return error
   try{
     let preparedQuery = db.prepare(`SELECT ${fieldName} FROM ${tableName} WHERE ${tableName}ID = ?`);
-    return preparedQuery.get(pkID)[fieldName];
+    let newValue = preparedQuery.get(pkID)[fieldName];
+    return {success: true, response: newValue}
   }
   catch (err){
-    return err;
+    return {success: false, response: err};
   }
 }
 
@@ -137,10 +132,11 @@ function deleteRow(db, tableName, pkID){
   //attempt delete, or return error
   try{
     let preparedDelete = db.prepare(`DELETE FROM ${tableName} WHERE ${tableName}ID = ?`);
-    return preparedDelete.run(pkID).changes;
+    let numberOfChangedRows = preparedDelete.run(pkID).changes;
+    return {success: true, response: numberOfChangedRows};
   }
   catch (err){
-    return err;
+    return {success: false, response: err};
   }
 }
 
