@@ -26,7 +26,6 @@ module.exports = helperDB
 //Exposed methods
 
 //creates database object
-//createDB :: String -> JSON
 function createDB(name){
   return {
     name: name, //String
