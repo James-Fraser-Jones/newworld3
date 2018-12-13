@@ -23,18 +23,40 @@ function closeDB(){
 }
 
 function deleteDB(dbName){
-  try {
+  try{
     fs.unlinkSync(`database/${dbName}.db`);
   }
-  catch (err) {
+  catch(err){
     console.log(err);
+  }
+  try{
+    fs.unlinkSync(`database/${dbName}.json`);
+  }
+  catch(err){
+    console.log(err);
+  }
+}
+
+function createDB(dbName, dbObj, insertObj){
+  deleteDB(dbName);
+  openDB(dbName);
+
+  let gen = helperDB.generate(db, dbObj);
+  if (gen.success){
+    fs.writeFile(`database/${dbName}.json`, JSON.stringify(dbObj, null, 2), err => {if (err){console.log(err);}});
+    console.log(helperDB.insert(db, insertObj));
+  }
+  else{
+    console.log(gen.response);
   }
 }
 
 //==============================================================================
 //SQL (created using my helper module)
 
-const auctionDB = helperDB.create("auctionDB");
+const dbName = "auctionDB";
+
+const auctionDB = helperDB.create(dbName);
 
 const permission = helperDB.addTable(auctionDB, "Permission", false);
 helperDB.addField(permission, "Name", helperDB.type.TEXT, false, false, null, null, null);
@@ -83,32 +105,28 @@ const initInsert =
 //==============================================================================
 //Testing code
 
-//set database setup
-deleteDB("test1");
-openDB("test1");
-console.log(helperDB.generate(db, auctionDB));
-console.log(helperDB.insert(db, initInsert));
+createDB(dbName, auctionDB, initInsert);
 
-//test cell updating
-let exampleUpdates =
-[{tableName:"Bod", fieldName:"Email", pkID:1, value:"Mr Johnson"},
- {tableName:"Bid", fieldName:"Address", pkID:1, value:55}];
-console.log("\nUpdate Test:\n");
-console.log(helperDB.update(db, exampleUpdates));
-
-//test row inserting
-let exampleInserts =
-[{tableName:"Bod", fieldNames:["PermissionID", "FirstName", "LastName", "ContactNum", "Email", "Address"], values:[1, "Alex", "Baby", "07940234567", "donkey@home.co.uk", "My house"]},
- {tableName:"Bod", fieldNames:["BermissionID", "FirstName", "LastName", "ContactNum", "Email", "Address"], values:[2, "Johnny", "Rotten", "666", "dunkey@home.co.uk", "Peach's Castle"]}];
-console.log("\n\nInsert Test:\n");
-console.log(helperDB.insert(db, exampleInserts));
-
-//test row deletion
-let exampleDeletes =
-[{tableName:"Permission", pkID:3},
- {tableName:"Parmission", pkID:4}];
-console.log("\n\nDelete Test:\n");
-console.log(helperDB.delete(db, exampleDeletes));
+// //test cell updating
+// let exampleUpdates =
+// [{tableName:"Bod", fieldName:"Email", pkID:1, value:"Mr Johnson"},
+//  {tableName:"Bid", fieldName:"Address", pkID:1, value:55}];
+// console.log("\nUpdate Test:\n");
+// console.log(helperDB.update(db, exampleUpdates));
+//
+// //test row inserting
+// let exampleInserts =
+// [{tableName:"Bod", fieldNames:["PermissionID", "FirstName", "LastName", "ContactNum", "Email", "Address"], values:[1, "Alex", "Baby", "07940234567", "donkey@home.co.uk", "My house"]},
+//  {tableName:"Bod", fieldNames:["BermissionID", "FirstName", "LastName", "ContactNum", "Email", "Address"], values:[2, "Johnny", "Rotten", "666", "dunkey@home.co.uk", "Peach's Castle"]}];
+// console.log("\n\nInsert Test:\n");
+// console.log(helperDB.insert(db, exampleInserts));
+//
+// //test row deletion
+// let exampleDeletes =
+// [{tableName:"Permission", pkID:3},
+//  {tableName:"Parmission", pkID:4}];
+// console.log("\n\nDelete Test:\n");
+// console.log(helperDB.delete(db, exampleDeletes));
 
 //==============================================================================
 //Notes
@@ -120,4 +138,9 @@ Integer
 Text
 Date (Text)
 Money (Integer)
+*/
+
+/*
+Atom shortcut for collapse all when viewing JSON:
+CTRL + ALT + SHIFT + '['
 */

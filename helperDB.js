@@ -26,6 +26,7 @@ module.exports = helperDB
 //Exposed methods
 
 //creates database object
+//createDB :: String -> JSON
 function createDB(name){
   return {
     name: name, //String
@@ -50,10 +51,10 @@ function generateDB(db, dbObj){
   try {
     let sql = generateDBSQL(dbObj);
     db.exec(sql);
-    return "DB Generation Success!";
+    return {success: true, response: 1};
   }
   catch (err){
-    return err;
+    return {success: false, response: err};
   }
 }
 
