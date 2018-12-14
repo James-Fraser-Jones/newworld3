@@ -108,3 +108,30 @@ Money (Integer)
 Atom shortcut for collapse all when viewing JSON:
 CTRL + ALT + SHIFT + '['
 */
+
+/*
+New helperDB API:
+
+ CreateTable :: DB -> (String, Bool, [(String, Int, Bool, Bool, a, String, String)]) -> IO Maybe Error
+InsertRecord :: DB -> (String, [(String, a)])                                        -> IO (String, [(String, a)], Either Error Int)
+  UpdateCell :: DB -> (String, String, Int, a)                                       -> IO (String, String, Int, a, Either Error a)
+DeleteRecord :: DB -> (String, Int)                                                  -> IO (String, Int, Maybe Error)
+
+These functions use the objects directly to represent these tuples.
+Then just map these functions over Tables, URecords, Cells, DRecords objects, respectively, no need to create new functions for this.
+
+Forget object making functions. Just have a static "Tables" JSON file for your database and access it via the filesystem when you want to
+map "CreateTable" over it.
+
+Print errors created by CreateTable to the console, errors from other functions will be captured and dealt with client side.
+
+////////////////////////////////////////////////////////////////////////////////////
+
+Other functions:
+
+Generic file deleting function which can be used to delete database files.
+OpenDatabase database wrapper function.
+InitDatabase database function which takes a newly opened database and (attempts to) adds all the tables from the Tables.JSON file to it.
+
+Might not need a CloseDatabase database wrapper funciton. (Need to test how this interacts with database file getting deleted etc..)
+*/
