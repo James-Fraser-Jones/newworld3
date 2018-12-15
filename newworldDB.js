@@ -15,9 +15,9 @@ class NewworldDB {
   //DB Creation, Connection and Deletion
 
   //opens database, or creates new one if file is not present
-  openDatabase(fileName){
+  openDatabase(dbName){
     try{
-      this.db = new Database(`database/${fileName}.db`);
+      this.db = new Database(`database/${dbName}.db`);
     }
     catch (err){
       console.log(err);
@@ -27,7 +27,9 @@ class NewworldDB {
   //attempts to close current database connection
   closeDatabase(){
     try{
-      this.db.close();
+      if (this.db && this.db.open){
+        this.db.close();
+      }
     }
     catch (err){
       console.log(err);
