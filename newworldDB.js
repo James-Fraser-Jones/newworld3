@@ -12,14 +12,6 @@ const Database = require('better-sqlite3');
 class NewworldDB {
 
   //====================================
-  //Constructor
-
-  //declares sqlite-better variable
-  constructor(){
-    let db;
-  }
-
-  //====================================
   //DB Creation, Connection and Deletion
 
   //opens database, or creates new one if file is not present

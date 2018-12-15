@@ -12,10 +12,10 @@ const db = new NewworldDB();
 
 function createMyDB(){
   //create tables
-  let tableObjs = JSON.parse(fs.readFileSync('database/auctionTables.json', 'utf8'));
+  let tableObjs = JSON.parse(fs.readFileSync('database/objects/auctionInitialTables.json', 'utf8'));
   tableObjs.forEach(db.createTable, db); // <-- second parameter specifies what "this." variable should reference
   //insert records
-  let insertObjs = JSON.parse(fs.readFileSync('database/auctionInserts.json', 'utf8'));
+  let insertObjs = JSON.parse(fs.readFileSync('database/objects/auctionInitialInserts.json', 'utf8'));
   insertObjs.forEach(db.insertRecord, db); // <-- second parameter specifies what "this." variable should reference
 }
 
@@ -29,7 +29,6 @@ db.deleteDatabase();
 //create tables
 db.openDatabase("auctionDB");
 createMyDB();
-console.log(db.db.open); //db isn't private :/
 
 //==============================================================================
 //Notes
