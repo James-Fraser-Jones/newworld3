@@ -1,0 +1,7 @@
+[
+  {"tableName":"Permission", "fieldNames":["PermissionID", "Name"], "values":[1, "Admin"]},
+  {"tableName":"Permission", "fieldNames":["PermissionID", "Name"], "values":[2, "Manager"]},
+  {"tableName":"Permission", "fieldNames":["PermissionID", "Name"], "values":[3, "Employee"]},
+  {"tableName":"Permission", "fieldNames":["PermissionID", "Name"], "values":[4, "Customer"]},
+  {"tableName":"Bod", "fieldNames":["PermissionID", "FirstName", "LastName", "ContactNum", "Email"], "values":[1, "Admin", "Admin", "", ""]}
+]
