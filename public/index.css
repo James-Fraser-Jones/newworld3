@@ -1,0 +1,13 @@
+body, html {
+    font-family: Roboto,Helvetica,Arial,sans-serif;
+    font-weight: 400;
+    color: #363636;
+}
+
+.handsontable * {
+    font-size: inherit;
+}
+
+.handsontable {
+    font-size: 13px;
+}

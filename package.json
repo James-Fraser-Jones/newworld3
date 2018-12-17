@@ -9,6 +9,8 @@
   "author": "JFJ",
   "license": "ISC",
   "dependencies": {
-    "better-sqlite3": "^5.0.1"
+    "better-sqlite3": "^5.0.1",
+    "express": "^4.16.4",
+    "socketio": "^1.0.0"
   }
 }

@@ -1,6 +1,23 @@
 'use strict';
 
 //==============================================================================
+//Notes
+
+/*
+So we've got a bunch of types so far:
+Boolean (Integer)
+Integer
+Text
+Date (Text)
+Money (Integer)
+*/
+
+/*
+Atom shortcut for collapse all when viewing JSON:
+CTRL + ALT + SHIFT + '['
+*/
+
+//==============================================================================
 //Dependencies and Globals
 
 const fs = require('fs');
@@ -173,6 +190,18 @@ class NewworldDB {
     }
     catch (err){
       deleteObj.result = {success: false, response: err};
+    }
+  }
+
+  //adds {success:true, response:dataTable} or {success:false, response:errorMessage} as result to queryObj
+  queryTable(queryObj){
+    try{
+      let sql = `SELECT * FROM ${queryObj.tableName}`;
+      let dt = this.db.exec(sql);
+      queryObj.result = {success: true, response: dt};
+    }
+    catch(err){
+      queryObj.result = {success: false, response: err};
     }
   }
 

@@ -1,45 +1,63 @@
 'use strict';
 
 //==============================================================================
-//Global variables
+//Global references and variables
 
 const fs = require('fs');
+
 const NewworldDB = require('./newworldDB');
 const db = new NewworldDB();
 
-//==============================================================================
-//DB Testing
+const express = require('express');
+const app = express();
 
-//reset db
+const server = require('http').createServer(app);
+const io = require('socket.io')(server);
+
+const port = 4200;
+
+//==============================================================================
+//Express static content delivery
+
+app.get('/', (req, res, next) => {
+    res.sendFile(__dirname + '/public/index.html');
+});
+
+app.use('/node_modules', express.static(__dirname + '/node_modules'));
+app.use('/public', express.static(__dirname + '/public'));
+
+//==============================================================================
+//SocketIO messaging
+
+// io.on('connection', socket => {
+//   console.log('user connected');
+//
+//   const tableData = db.prepare('SELECT * FROM Bod').all();
+//   socket.emit('initialize', tableData);
+//
+//   socket.on('disconnect', () => {
+//     console.log('user disconnected');
+//   });
+//
+//   socket.on('toServer', dbObjs => {
+//     try{
+//       console.log(dbObjs);
+//     }
+//     catch (err){
+//       console.log(err);
+//     }
+//   });
+// });
+
+//==============================================================================
+//Exec
+
+//open database
 db.openDatabase("auctionDB");
-db.deleteDatabase();
 
-//create tables
-db.createDatabase("auctionDB");
+let testQuery = {tableName: "Permission"};
+db.queryTable(testQuery);
+console.log(testQuery);
 
-//insert a null value into a non-null field
-let testInsert = {tableName:"Bod", fieldNames:["PermissionID", "FirstName", "LastName", "ContactNum", "Email", "Address"], values:[1, "James", "Fraser-Jones", null, null, null]};
-db.insertRecord(testInsert);
-console.log(testInsert);
-
-//update a non-null field with null
-let testUpdate = {tableName:"Bod", fieldName:"FirstName", pkID:2, value:null};
-db.updateCell(testUpdate);
-console.log(testUpdate);
-
-//==============================================================================
-//Notes
-
-/*
-So we've got a bunch of types so far:
-Boolean (Integer)
-Integer
-Text
-Date (Text)
-Money (Integer)
-*/
-
-/*
-Atom shortcut for collapse all when viewing JSON:
-CTRL + ALT + SHIFT + '['
-*/
+//listen on port
+//server.listen(port, () => console.log(`Listening on port ${port}!`));
