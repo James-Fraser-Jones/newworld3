@@ -18,7 +18,7 @@ class NewworldDB {
   openDatabase(dbName){
     try{
       this.db = new Database(`database/${dbName}.db`);
-      this.tables = JSON.parse(fs.readFileSync(`database/${dbName}Tables.json`, 'utf8'));
+      this.tables = JSON.parse(fs.readFileSync(`public/${dbName}Tables.json`, 'utf8'));
     }
     catch (err){
       console.log(err);
@@ -46,7 +46,7 @@ class NewworldDB {
 
       this.tables.forEach(this.createTable, this);
 
-      let inserts = JSON.parse(fs.readFileSync(`database/${dbName}Inserts.json`, 'utf8'));
+      let inserts = JSON.parse(fs.readFileSync(`public/${dbName}Inserts.json`, 'utf8'));
       inserts.forEach(this.insertRecord, this);
     }
     catch (err){
