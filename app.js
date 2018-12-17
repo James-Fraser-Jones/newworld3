@@ -10,14 +10,14 @@ const db = new NewworldDB();
 //==============================================================================
 //DB Functions
 
-function createMyDB(){
-  //create tables
-  let tableObjs = JSON.parse(fs.readFileSync('database/objects/auctionInitialTables.json', 'utf8'));
-  tableObjs.forEach(db.createTable, db); // <-- second parameter specifies what "this." variable should reference
-  //insert records
-  let insertObjs = JSON.parse(fs.readFileSync('database/objects/auctionInitialInserts.json', 'utf8'));
-  insertObjs.forEach(db.insertRecord, db); // <-- second parameter specifies what "this." variable should reference
-}
+// function createMyDB(){
+//   //create tables
+//   let tableObjs = JSON.parse(fs.readFileSync('database/objects/auctionInitialTables.json', 'utf8'));
+//   tableObjs.forEach(db.createTable, db); // <-- second parameter specifies what "this." variable should reference
+//   //insert records
+//   let insertObjs = JSON.parse(fs.readFileSync('database/objects/auctionInitialInserts.json', 'utf8'));
+//   insertObjs.forEach(db.insertRecord, db); // <-- second parameter specifies what "this." variable should reference
+// }
 
 //==============================================================================
 //DB Testing
@@ -27,8 +27,17 @@ db.openDatabase("auctionDB");
 db.deleteDatabase();
 
 //create tables
-db.openDatabase("auctionDB");
-createMyDB();
+db.createDatabase("auctionDB");
+
+// //insert a null value into a non-null field
+// let testInsert = {"tableName":"Bod", "fieldNames":["PermissionID", "FirstName", "LastName", "ContactNum", "Email", "Address"], "values":[1, "James", "Fraser-Jones", null, null, null]};
+// db.insertRecord(testInsert);
+// console.log(testInsert);
+//
+// //update a non-null field with null
+// let testUpdate = {tableName:"Bod", fieldName:"FirstName", pkID:2, value:null};
+// db.updateCell(testUpdate);
+// console.log(testUpdate);
 
 //==============================================================================
 //Notes

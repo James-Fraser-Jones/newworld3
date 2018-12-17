@@ -12,12 +12,13 @@ const Database = require('better-sqlite3');
 class NewworldDB {
 
   //====================================
-  //DB Creation, Connection and Deletion
+  //DB Connection, Creation and Deletion
 
   //opens database, or creates new one if file is not present
   openDatabase(dbName){
     try{
       this.db = new Database(`database/${dbName}.db`);
+      this.tables = JSON.parse(fs.readFileSync(`database/${dbName}Tables.json`, 'utf8'));
     }
     catch (err){
       console.log(err);
@@ -29,7 +30,24 @@ class NewworldDB {
     try{
       if (this.db && this.db.open){
         this.db.close();
+        delete this.db;
+        delete this.tables;
       }
+    }
+    catch (err){
+      console.log(err);
+    }
+  }
+
+  //attempts to create database, based on DB name (this depends on existence "Tables" and "Inserts" files of the same name)
+  createDatabase(dbName){
+    try{
+      this.openDatabase(dbName);
+
+      this.tables.forEach(this.createTable, this);
+
+      let inserts = JSON.parse(fs.readFileSync(`database/${dbName}Inserts.json`, 'utf8'));
+      inserts.forEach(this.insertRecord, this);
     }
     catch (err){
       console.log(err);
@@ -60,7 +78,7 @@ class NewworldDB {
       let sqlFields = tableObj.fields.map(fieldObj => {
         let words = [];
         words.push(`  '${fieldObj.name}'`);
-        words.push(this.getSQLiteType(fieldObj.type));
+        words.push(this.getSQLiteTypeName(fieldObj.type));
         if (!fieldObj.nullable){ words.push("NOT NULL") };
         if (fieldObj.default){ words.push(`DEFAULT ${this.wrapString(fieldObj.default)}`) };
         if (fieldObj.check){ words.push(`CHECK (${fieldObj.check})`) };
@@ -90,6 +108,18 @@ class NewworldDB {
   //adds {success:true, response:lastInsertedID} or {success:false, response:errorMessage} as result to insertObj
   insertRecord(insertObj){
     try{
+      //null protection
+      for (let i = 0; i < insertObj.values.length; i++){
+        if (insertObj.values[i] === null){
+          let table = this.searchForName(this.tables, insertObj.tableName);
+          let field = this.searchForName(table.fields, insertObj.fieldNames[i]);
+          if (!field.nullable){
+            insertObj.values[i] = this.getSQLiteTypeDefaultValue(field.type);
+          }
+        }
+      }
+
+      //begin insert process
       let sql = `INSERT INTO ${insertObj.tableName}(${insertObj.fieldNames.join(",")}) VALUES (${insertObj.values.map(() => "?").join(",")})`
       let preparedInsert = this.db.prepare(sql);
       let lastInsertedID = preparedInsert.run(insertObj.values).lastInsertRowid;
@@ -103,6 +133,15 @@ class NewworldDB {
   //adds {success:true, response:newValue} or {success:false, response:errorMessage} as result to updateObj
   updateCell(updateObj){
     try{
+      //null protection
+      if (updateObj.value === null){
+        let table = this.searchForName(this.tables, updateObj.tableName);
+        let field = this.searchForName(table.fields, updateObj.fieldName);
+        if (!field.nullable){
+          updateObj.value = this.getSQLiteTypeDefaultValue(field.type);
+        }
+      }
+
       //update
       let sql = `UPDATE ${updateObj.tableName} SET ${updateObj.fieldName} = ? WHERE ${updateObj.tableName}ID = ?`
       let preparedUpdate = this.db.prepare(sql);
@@ -141,23 +180,46 @@ class NewworldDB {
   //Helper functions
 
   //get name of SQLite type
-  getSQLiteType(num){
+  getSQLiteTypeName(num){
     switch(num){
       case 1:
-        return "INTEGER"
-        break;
-      case 2:
         return "TEXT"
         break;
-      case 3:
-        return "BLOB"
+      case 2:
+        return "INTEGER"
         break;
-      case 4:
+      case 3:
         return "REAL"
         break;
-      case 5:
-        return "NUMERIC"
+      // case 4:
+      //   return "NUMERIC"
+      //   break;
+      // case 5:
+      //   return "BLOB"
+      //   break;
+      default:
+        return null;
+    }
+  }
+
+  //get default value for SQLite type to replace null values with, where necessary
+  getSQLiteTypeDefaultValue(num){
+    switch(num){
+      case 1:
+        return ""
         break;
+      case 2:
+        return 0
+        break;
+      case 3:
+        return 0.0
+        break;
+      // case 4:
+      //   return 0
+      //   break;
+      // case 5:
+      //   return 0
+      //   break;
       default:
         return null;
     }
@@ -169,6 +231,16 @@ class NewworldDB {
       return `'${value}'`;
     }
     return value;
+  }
+
+  //search array of arbitrary objects for one with matching "name" property
+  searchForName(objs, name){
+    for (let i = 0; i < objs.length; i++){
+      if (objs[i].name === name){
+        return objs[i];
+      }
+    }
+    return null;
   }
 }
 
