@@ -56,7 +56,7 @@ class NewworldDB {
     }
   }
 
-  //attempts to create database, based on DB name (this depends on existence "Tables" and "Inserts" files of the same name)
+  //attempts to create database, based on DB name (this depends on existence of "Tables" and "Inserts" files of the same name)
   createDatabase(dbName){
     try{
       this.openDatabase(dbName);
@@ -119,6 +119,20 @@ class NewworldDB {
     }
     catch (err){
       console.log(err);
+    }
+  }
+
+  //adds {success:true, response:dataTable} or {success:false, response:errorMessage} as result to queryObj
+  queryTable(queryObj){
+    try{
+      let sql = `SELECT * FROM ${queryObj.tableName}`;
+      let preparedQuery = this.db.prepare(sql);
+      let data = preparedQuery.all();
+      let info = this.searchForName(this.tables, queryObj.tableName);
+      queryObj.result = {success: true, response: {info: info, data: data}};
+    }
+    catch(err){
+      queryObj.result = {success: false, response: err};
     }
   }
 
@@ -190,18 +204,6 @@ class NewworldDB {
     }
     catch (err){
       deleteObj.result = {success: false, response: err};
-    }
-  }
-
-  //adds {success:true, response:dataTable} or {success:false, response:errorMessage} as result to queryObj
-  queryTable(queryObj){
-    try{
-      let sql = `SELECT * FROM ${queryObj.tableName}`;
-      let dt = this.db.exec(sql);
-      queryObj.result = {success: true, response: dt};
-    }
-    catch(err){
-      queryObj.result = {success: false, response: err};
     }
   }
 

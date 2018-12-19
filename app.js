@@ -55,9 +55,30 @@ app.use('/public', express.static(__dirname + '/public'));
 //open database
 db.openDatabase("auctionDB");
 
-let testQuery = {tableName: "Permission"};
-db.queryTable(testQuery);
-console.log(testQuery);
-
 //listen on port
-//server.listen(port, () => console.log(`Listening on port ${port}!`));
+server.listen(port, () => console.log(`Listening on port ${port}!`));
+
+//==============================================================================
+//DB Functions
+
+function callDB(messageObj){
+  switch(messageObj){
+    case 1:
+      return "TEXT"
+      break;
+    case 2:
+      return "INTEGER"
+      break;
+    case 3:
+      return "REAL"
+      break;
+    // case 4:
+    //   return "NUMERIC"
+    //   break;
+    // case 5:
+    //   return "BLOB"
+    //   break;
+    default:
+      return null;
+  }
+}
